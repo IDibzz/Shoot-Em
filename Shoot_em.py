@@ -23,7 +23,12 @@ projectiles2 = []
 projectile_color = (255, 0, 0)
 projectile_speed = 5
 projectile_speed2 = 10
-def draw(player, Player_moving):
+
+thingy_width = 20
+thingy_height = 10
+
+
+def draw(player, Player_moving, thingy):
     WIN.blit(BG, (0,0))
    
     pygame.draw.rect(WIN, "red", player)
@@ -47,10 +52,12 @@ def add_projectile(player_pos, target_pos):
 def main():
     run = True
     player = pygame.Rect(200,HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
+    thingy = pygame.Rect(400,400,thingy_width,thingy_height)
     clock = pygame.time.Clock()
     Player_moving = False  
-       
-
+    last_shot_time = 0
+    shot_delay = 1000 
+    
 
 
     while run:
@@ -58,7 +65,7 @@ def main():
         
         player_pos = []
         player_pos = player.x + 20, player.y
-       
+        current_time = pygame.time.get_ticks()
         keys = pygame.key.get_pressed()
         
         
@@ -76,10 +83,15 @@ def main():
                 run = False
             if event.type == pygame.MOUSEBUTTONDOWN:
             # Add a new projectile on mouse click
-                if Player_moving:
-                    projectiles2.append(add_projectile(player_pos, pygame.mouse.get_pos())) 
-                else:
-                    projectiles.append(add_projectile(player_pos, pygame.mouse.get_pos()))   
+                current_time = pygame.time.get_ticks()
+                if current_time - last_shot_time >= shot_delay:
+                    last_shot_time = current_time
+                    if Player_moving:
+                        projectiles2.append(add_projectile(player_pos, pygame.mouse.get_pos())) 
+                    else:
+                        projectiles.append(add_projectile(player_pos, pygame.mouse.get_pos()))  
+                    
+                    
 
         
 
@@ -103,7 +115,7 @@ def main():
             player.y -= PLAYER_VEL
         if keys[pygame.K_s] and player.y + PLAYER_VEL + player.height <= HEIGHT:
             player.y += PLAYER_VEL
-        draw(player, Player_moving)
+        draw(player, Player_moving, thingy)
 
 
 
