@@ -1,0 +1,9 @@
+1. Player has been added and all functionalitys for it moving
+2. Projectiles added, change in speed if character is moving or not. Collisions for projectiles with enemies also added.
+3. Enemies/thingys added. Score goes up if projectile hit them.
+4. Gun added that is tracked around the player as the mouse moves. Projectiles now shoot from the "Gun".
+
+To Do (short term): have enemies have unique movements that try to get to the palayer, have other enimies have guns that shoot at the player too with unique movements. 
+TLDR: enemie types need to be added
+
+To do (long term): add multiroom stages like into the gungeon that get progressively harder. Also add powerups that change gun behavior. Need art too, I dunno how to dat....
