@@ -29,11 +29,11 @@ thingy_width = 20
 thingy_height = 10
 FONT = pygame.font.SysFont("comicsans", 30)
 
-def draw(player, Player_moving, thingy, score):
+def draw(player, Player_moving, thingy, score, orbit_circle_pos):
     WIN.blit(BG, (0,0))
     
     
-    
+    pygame.draw.circle(WIN, (0, 255, 0), orbit_circle_pos, 10)
     
     pygame.draw.rect(WIN, "red", player)
     
@@ -48,7 +48,17 @@ def draw(player, Player_moving, thingy, score):
     for thing in thingy: 
         pygame.draw.rect(WIN, "blue", thing)
     pygame.display.update()
-    
+
+def gun_position(player, orbit_distance):
+    mx, my = pygame.mouse.get_pos()  # Mouse position
+    angle_to_mouse = math.atan2(my - player.centery, mx - player.centerx)
+    orbit_circle_x = int(player.centerx + orbit_distance * math.cos(angle_to_mouse))
+    orbit_circle_y = int(player.centery + orbit_distance * math.sin(angle_to_mouse))
+    orbit_circle_pos = (orbit_circle_x, orbit_circle_y)
+    return orbit_circle_pos
+   
+
+
 def check_collision(thingies, projectiles, score, thingy_count):
     for thingy in thingies[:]:  # Iterate over a copy of the list to avoid modification issues
         for projectile in projectiles:
@@ -79,6 +89,9 @@ def main():
     shot_delay = 1000 
     score = 0
     thingy_count = 0
+    orbit_distance = 60
+    
+
 
     while run:
         clock.tick(60)
@@ -89,7 +102,9 @@ def main():
         keys = pygame.key.get_pressed()
         
         
-            
+        orbit_circle_pos = gun_position(player, orbit_distance)
+        
+   
             
 
         
@@ -111,9 +126,9 @@ def main():
                 if current_time - last_shot_time >= shot_delay:
                     last_shot_time = current_time
                     if Player_moving:
-                        projectiles2.append(add_projectile(player_pos, pygame.mouse.get_pos())) 
+                        projectiles2.append(add_projectile(orbit_circle_pos, pygame.mouse.get_pos())) 
                     else:
-                        projectiles.append(add_projectile(player_pos, pygame.mouse.get_pos()))  
+                        projectiles.append(add_projectile(orbit_circle_pos, pygame.mouse.get_pos()))  
                     
                     
         
@@ -150,7 +165,7 @@ def main():
             player.y -= PLAYER_VEL
         if keys[pygame.K_s] and player.y + PLAYER_VEL + player.height <= HEIGHT:
             player.y += PLAYER_VEL
-        draw(player, Player_moving, thingy, score)
+        draw(player, Player_moving, thingy, score, orbit_circle_pos)
 
 
 
