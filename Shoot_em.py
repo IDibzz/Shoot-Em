@@ -24,13 +24,17 @@ projectile_color = (255, 0, 0)
 projectile_speed = 5
 projectile_speed2 = 10
 
+
 thingy_width = 20
 thingy_height = 10
 FONT = pygame.font.SysFont("comicsans", 30)
 
 def draw(player, Player_moving, thingy, score):
     WIN.blit(BG, (0,0))
-    pygame.draw.rect(WIN, "blue", thingy)
+    
+    
+    
+    
     pygame.draw.rect(WIN, "red", player)
     
     score_text = FONT.render(str(score), 1, "white")
@@ -41,18 +45,21 @@ def draw(player, Player_moving, thingy, score):
     
     for projectile in projectiles:
             pygame.draw.circle(WIN, projectile_color, (int(projectile[0]), int(projectile[1])), 5)
+    for thing in thingy: 
+        pygame.draw.rect(WIN, "blue", thing)
     pygame.display.update()
     
-def check_collision(thingy, projectiles, score): 
-    thingy_hit = False
-    for projectile in projectiles:
-        # Create a rect for the projectile
-        projectile_rect = pygame.Rect(projectile[0] - 5, projectile[1] - 5, 10, 10)
-        if projectile_rect.colliderect(thingy):
-            projectiles.remove(projectile)
-            score += 1
-            thingy_hit = True
-    return score, thingy_hit
+def check_collision(thingies, projectiles, score, thingy_count):
+    for thingy in thingies[:]:  # Iterate over a copy of the list to avoid modification issues
+        for projectile in projectiles:
+            projectile_rect = pygame.Rect(projectile[0] - 5, projectile[1] - 5, 10, 10)
+            if projectile_rect.colliderect(thingy):
+                projectiles.remove(projectile)
+                thingies.remove(thingy)
+                score += 1
+                thingy_count -= 1
+                break  # Break the inner loop to avoid errors due to removing the projectile
+    return score, thingies, thingy_count
 
 def add_projectile(player_pos, target_pos):
     dx, dy = target_pos[0] - player_pos[0], target_pos[1] - player_pos[1]
@@ -65,13 +72,13 @@ def add_projectile(player_pos, target_pos):
 def main():
     run = True
     player = pygame.Rect(200,HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
-    thingy = pygame.Rect(400,400,thingy_width,thingy_height)
+    thingy= []
     clock = pygame.time.Clock()
     Player_moving = False  
     last_shot_time = 0
     shot_delay = 1000 
     score = 0
-
+    thingy_count = 0
 
     while run:
         clock.tick(60)
@@ -81,6 +88,10 @@ def main():
         current_time = pygame.time.get_ticks()
         keys = pygame.key.get_pressed()
         
+        
+            
+            
+
         
         if keys[pygame.K_a] | keys[pygame.K_s] | keys[pygame.K_d] | keys[pygame.K_w]:
             Player_moving = True
@@ -119,13 +130,18 @@ def main():
                 projectile[1] += projectile[3] * projectile_speed
         
         
-        score, thingy_hit = check_collision(thingy, projectiles, score)
-        if not thingy_hit:  
-            score, thingy_hit = check_collision(thingy, projectiles2, score)
+        score, thingy, thingy_count = check_collision(thingy, projectiles, score, thingy_count)
+        score, thingy, thingy_count = check_collision(thingy, projectiles2, score, thingy_count)
 
         
-        
-
+        if thingy_count < 5:
+            for _ in range(1):
+                thingy_x = random.randint(0, WIDTH - thingy_width)
+                thingy_y = random.randint(0, HEIGHT - thingy_height)
+                thing = pygame.Rect(thingy_x, thingy_y, thingy_width, thingy_height)
+                thingy.append(thing)
+            thingy_count += 1
+          
         if keys[pygame.K_a] and player.x - PLAYER_VEL >= 0:
             player.x -= PLAYER_VEL
         if keys[pygame.K_d] and player.x + PLAYER_VEL + player.width <= WIDTH:
