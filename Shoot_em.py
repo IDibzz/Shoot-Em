@@ -14,6 +14,8 @@ pygame.display.set_caption("Shoot Em")
 
 BG = pygame.transform.scale(pygame.image.load("grass3.png"), (WIDTH,HEIGHT))
 
+pygame.event.set_grab(True)
+
 PLAYER_WIDTH = 40
 PLAYER_HEIGHT = 60
 PLAYER_VEL = 5
@@ -24,7 +26,7 @@ projectile_color = (255, 0, 0)
 projectile_speed = 5
 projectile_speed2 = 10
 
-
+thingy_vel = 3
 thingy_width = 20
 thingy_height = 10
 FONT = pygame.font.SysFont("comicsans", 30)
@@ -48,6 +50,28 @@ def draw(player, Player_moving, thingy, score, orbit_circle_pos):
     for thing in thingy: 
         pygame.draw.rect(WIN, "blue", thing)
     pygame.display.update()
+
+def thingy_tracking(player, thingy, thingy_vel):
+    for thing in thingy:
+        dx = player.centerx - thing.centerx
+        dy = player.centery - thing.centery
+        distance = math.hypot(dx, dy)
+        if distance != 0:  # Avoid division by zero
+            dx, dy = dx / distance, dy / distance
+        thing.x += dx * thingy_vel
+        thing.y += dy * thingy_vel
+        
+def thingy_1(player, thingy, thingy_vel):
+    for thing in thingy:
+        dx = player.centerx - thing.centerx
+        dy = player.centery - thing.centery
+        distance = math.hypot(dx, dy)
+        if distance != 0:  # Avoid division by zero
+            dx, dy = dx / distance, dy / distance
+        rand1 = random.randint(0,1)
+        thing.x += (dx - rand1) * thingy_vel
+        thing.y += (dy - rand1)* thingy_vel
+    
 
 def gun_position(player, orbit_distance):
     mx, my = pygame.mouse.get_pos()  # Mouse position
@@ -104,7 +128,7 @@ def main():
         
         orbit_circle_pos = gun_position(player, orbit_distance)
         
-   
+        thingy_tracking(player, thingy, thingy_vel)
             
 
         
