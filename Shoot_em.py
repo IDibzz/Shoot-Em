@@ -22,6 +22,9 @@ PLAYER_VEL = 5
 
 projectiles = []
 projectiles2 = []
+
+thingy_projectile = []
+
 projectile_color = (255, 0, 0)
 projectile_speed = 5
 projectile_speed2 = 10
@@ -31,25 +34,37 @@ thingy_width = 20
 thingy_height = 10
 FONT = pygame.font.SysFont("comicsans", 30)
 
-def draw(player, Player_moving, thingy, score, orbit_circle_pos):
+def draw(player, Player_moving, thingy, score, orbit_circle_pos, count2, thingy2):
     WIN.blit(BG, (0,0))
     
     
     pygame.draw.circle(WIN, (0, 255, 0), orbit_circle_pos, 10)
     
     pygame.draw.rect(WIN, "red", player)
-    
+    collisions = FONT.render(str(count2), 1, "white")
     score_text = FONT.render(str(score), 1, "white")
     WIN.blit(score_text, (10,10))
-
+    WIN.blit(collisions, (10,40))
     for projectile in projectiles2:
         pygame.draw.circle(WIN, projectile_color, (int(projectile[0]), int(projectile[1])), 5)
     
     for projectile in projectiles:
-            pygame.draw.circle(WIN, projectile_color, (int(projectile[0]), int(projectile[1])), 5)
+        pygame.draw.circle(WIN, projectile_color, (int(projectile[0]), int(projectile[1])), 5)
+    
+    for projectile in thingy_projectile:
+        pygame.draw.circle(WIN, projectile_color, (int(projectile[0]), int(projectile[1])), 5)
+
     for thing in thingy: 
         pygame.draw.rect(WIN, "blue", thing)
+    
+    
+    for thing in thingy2: 
+        pygame.draw.rect(WIN, "black", thing)
+        
+    
     pygame.display.update()
+
+#enemy type1: following you trying to touch you to kill you
 
 def thingy_tracking(player, thingy, thingy_vel):
     for thing in thingy:
@@ -60,17 +75,12 @@ def thingy_tracking(player, thingy, thingy_vel):
             dx, dy = dx / distance, dy / distance
         thing.x += dx * thingy_vel
         thing.y += dy * thingy_vel
-        
-def thingy_1(player, thingy, thingy_vel):
+
+def thingy_2(thingy, player_pos):
     for thing in thingy:
-        dx = player.centerx - thing.centerx
-        dy = player.centery - thing.centery
-        distance = math.hypot(dx, dy)
-        if distance != 0:  # Avoid division by zero
-            dx, dy = dx / distance, dy / distance
-        rand1 = random.randint(0,1)
-        thing.x += (dx - rand1) * thingy_vel
-        thing.y += (dy - rand1)* thingy_vel
+        thingy_pos = thing.centerx, thing.centery
+        thingy_projectile.append(add_projectile(thingy_pos, player_pos))
+    
     
 
 def gun_position(player, orbit_distance):
@@ -80,8 +90,12 @@ def gun_position(player, orbit_distance):
     orbit_circle_y = int(player.centery + orbit_distance * math.sin(angle_to_mouse))
     orbit_circle_pos = (orbit_circle_x, orbit_circle_y)
     return orbit_circle_pos
-   
-
+#fix this once base game is done so it take you to menu or death screen or whatever
+def play_thingy_col(player, thingy, count):
+    for thing in thingy:
+        if player.colliderect(thing):
+            count += 1
+    return count
 
 def check_collision(thingies, projectiles, score, thingy_count):
     for thingy in thingies[:]:  # Iterate over a copy of the list to avoid modification issues
@@ -107,30 +121,28 @@ def main():
     run = True
     player = pygame.Rect(200,HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
     thingy= []
+    thingy2 = []
     clock = pygame.time.Clock()
     Player_moving = False  
     last_shot_time = 0
+    last_shot_time2 = 0
     shot_delay = 1000 
     score = 0
     thingy_count = 0
     orbit_distance = 60
+    count2 = 0
     
-
 
     while run:
         clock.tick(60)
-        
-        player_pos = []
-        player_pos = player.x + 20, player.y
+        player_pos = player.centerx, player.centery
         current_time = pygame.time.get_ticks()
         keys = pygame.key.get_pressed()
-        
-        
         orbit_circle_pos = gun_position(player, orbit_distance)
         
         thingy_tracking(player, thingy, thingy_vel)
-            
-
+        thingy_tracking(player, thingy2, thingy_vel)
+        
         
         if keys[pygame.K_a] | keys[pygame.K_s] | keys[pygame.K_d] | keys[pygame.K_w]:
             Player_moving = True
@@ -153,34 +165,52 @@ def main():
                         projectiles2.append(add_projectile(orbit_circle_pos, pygame.mouse.get_pos())) 
                     else:
                         projectiles.append(add_projectile(orbit_circle_pos, pygame.mouse.get_pos()))  
-                    
-                    
         
         
+
+        current_time2 = pygame.time.get_ticks()
+        if current_time2 - last_shot_time2 >= shot_delay:
+            last_shot_time2 = current_time2
+            thingy_2(thingy2, player_pos)
+
         
+
+        
+        for projectile in thingy_projectile:
+            projectile[0] += projectile[2] * projectile_speed
+            projectile[1] += projectile[3] * projectile_speed
         
         for projectile in projectiles2:
-                projectile[0] += projectile[2] * projectile_speed2
-                projectile[1] += projectile[3] * projectile_speed2
+            projectile[0] += projectile[2] * projectile_speed2
+            projectile[1] += projectile[3] * projectile_speed2
                 
         
         for projectile in projectiles:
-                projectile[0] += projectile[2] * projectile_speed
-                projectile[1] += projectile[3] * projectile_speed
+             projectile[0] += projectile[2] * projectile_speed
+             projectile[1] += projectile[3] * projectile_speed
         
         
         score, thingy, thingy_count = check_collision(thingy, projectiles, score, thingy_count)
         score, thingy, thingy_count = check_collision(thingy, projectiles2, score, thingy_count)
+        score, thingy2, thingy_count = check_collision(thingy2, projectiles, score, thingy_count)
+        score, thingy2, thingy_count = check_collision(thingy2, projectiles2, score, thingy_count)
 
-        
+         
         if thingy_count < 5:
+            
             for _ in range(1):
+                int1 = random.randint(0,5)
                 thingy_x = random.randint(0, WIDTH - thingy_width)
                 thingy_y = random.randint(0, HEIGHT - thingy_height)
                 thing = pygame.Rect(thingy_x, thingy_y, thingy_width, thingy_height)
-                thingy.append(thing)
+                if int1 == 1:
+                    thingy2.append(thing)
+                else:
+                    thingy.append(thing)
             thingy_count += 1
-          
+        
+        count2 = play_thingy_col(player, thingy, count2)
+    
         if keys[pygame.K_a] and player.x - PLAYER_VEL >= 0:
             player.x -= PLAYER_VEL
         if keys[pygame.K_d] and player.x + PLAYER_VEL + player.width <= WIDTH:
@@ -189,7 +219,7 @@ def main():
             player.y -= PLAYER_VEL
         if keys[pygame.K_s] and player.y + PLAYER_VEL + player.height <= HEIGHT:
             player.y += PLAYER_VEL
-        draw(player, Player_moving, thingy, score, orbit_circle_pos)
+        draw(player, Player_moving, thingy, score, orbit_circle_pos, count2, thingy2)
 
 
 
