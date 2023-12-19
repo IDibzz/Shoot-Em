@@ -47,25 +47,17 @@ def draw(player, Player_moving, thingy, score, orbit_circle_pos, count2, thingy2
     WIN.blit(collisions, (10,40))
     for projectile in projectiles2:
         pygame.draw.circle(WIN, projectile_color, (int(projectile[0]), int(projectile[1])), 5)
-    
     for projectile in projectiles:
         pygame.draw.circle(WIN, projectile_color, (int(projectile[0]), int(projectile[1])), 5)
-    
     for projectile in thingy_projectile:
         pygame.draw.circle(WIN, projectile_color, (int(projectile[0]), int(projectile[1])), 5)
-
     for thing in thingy: 
         pygame.draw.rect(WIN, "blue", thing)
-    
-    
     for thing in thingy2: 
         pygame.draw.rect(WIN, "black", thing)
-        
-    
     pygame.display.update()
 
-#enemy type1: following you trying to touch you to kill you
-
+#general enemy behavoir: following you trying to touch you to kill you
 def thingy_tracking(player, thingy, thingy_vel):
     for thing in thingy:
         dx = player.centerx - thing.centerx
@@ -81,8 +73,6 @@ def thingy_2(thingy, player_pos):
         thingy_pos = thing.centerx, thing.centery
         thingy_projectile.append(add_projectile(thingy_pos, player_pos))
     
-    
-
 def gun_position(player, orbit_distance):
     mx, my = pygame.mouse.get_pos()  # Mouse position
     angle_to_mouse = math.atan2(my - player.centery, mx - player.centerx)
@@ -90,6 +80,7 @@ def gun_position(player, orbit_distance):
     orbit_circle_y = int(player.centery + orbit_distance * math.sin(angle_to_mouse))
     orbit_circle_pos = (orbit_circle_x, orbit_circle_y)
     return orbit_circle_pos
+
 #fix this once base game is done so it take you to menu or death screen or whatever
 def play_thingy_col(player, thingy, count):
     for thing in thingy:
@@ -98,7 +89,7 @@ def play_thingy_col(player, thingy, count):
     return count
 
 def check_collision(thingies, projectiles, score, thingy_count):
-    for thingy in thingies[:]:  # Iterate over a copy of the list to avoid modification issues
+    for thingy in thingies[:]:  
         for projectile in projectiles:
             projectile_rect = pygame.Rect(projectile[0] - 5, projectile[1] - 5, 10, 10)
             if projectile_rect.colliderect(thingy):
@@ -106,15 +97,26 @@ def check_collision(thingies, projectiles, score, thingy_count):
                 thingies.remove(thingy)
                 score += 1
                 thingy_count -= 1
-                break  # Break the inner loop to avoid errors due to removing the projectile
+                break  
     return score, thingies, thingy_count
+
+def check_player_col(player, thingy_projectile, count2):
+    for projectile in  thingy_projectile:
+        projectile_rect = pygame.Rect(projectile[0] - 5, projectile[1] - 5, 10, 10)
+        if projectile_rect.colliderect(player):
+                thingy_projectile.remove(projectile)
+                #thingies.remove(thingy) eventually change to player
+                count2 += 1
+                break  
+    return count2
+
 
 def add_projectile(player_pos, target_pos):
     dx, dy = target_pos[0] - player_pos[0], target_pos[1] - player_pos[1]
     distance = math.hypot(dx, dy)
-    if distance == 0:  # Prevent division by zero
+    if distance == 0:  
         distance = 1
-    dx, dy = dx / distance, dy / distance  # Normalize
+    dx, dy = dx / distance, dy / distance  
     return [player_pos[0], player_pos[1], dx, dy]
 
 def main():
@@ -148,16 +150,12 @@ def main():
             Player_moving = True
         else:
             Player_moving = False
-        
-       
-                
-
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
             if event.type == pygame.MOUSEBUTTONDOWN:
-            # Add a new projectile on mouse click
+            
                 current_time = pygame.time.get_ticks()
                 if current_time - last_shot_time >= shot_delay:
                     last_shot_time = current_time
@@ -165,37 +163,27 @@ def main():
                         projectiles2.append(add_projectile(orbit_circle_pos, pygame.mouse.get_pos())) 
                     else:
                         projectiles.append(add_projectile(orbit_circle_pos, pygame.mouse.get_pos()))  
-        
-        
 
         current_time2 = pygame.time.get_ticks()
         if current_time2 - last_shot_time2 >= shot_delay:
             last_shot_time2 = current_time2
             thingy_2(thingy2, player_pos)
 
-        
-
-        
         for projectile in thingy_projectile:
             projectile[0] += projectile[2] * projectile_speed
             projectile[1] += projectile[3] * projectile_speed
-        
         for projectile in projectiles2:
             projectile[0] += projectile[2] * projectile_speed2
             projectile[1] += projectile[3] * projectile_speed2
-                
-        
         for projectile in projectiles:
              projectile[0] += projectile[2] * projectile_speed
              projectile[1] += projectile[3] * projectile_speed
-        
         
         score, thingy, thingy_count = check_collision(thingy, projectiles, score, thingy_count)
         score, thingy, thingy_count = check_collision(thingy, projectiles2, score, thingy_count)
         score, thingy2, thingy_count = check_collision(thingy2, projectiles, score, thingy_count)
         score, thingy2, thingy_count = check_collision(thingy2, projectiles2, score, thingy_count)
-
-         
+        count2 = check_player_col(player, thingy_projectile, count2)
         if thingy_count < 5:
             
             for _ in range(1):
@@ -220,9 +208,6 @@ def main():
         if keys[pygame.K_s] and player.y + PLAYER_VEL + player.height <= HEIGHT:
             player.y += PLAYER_VEL
         draw(player, Player_moving, thingy, score, orbit_circle_pos, count2, thingy2)
-
-
-
 
 if __name__ == "__main__":
     main() 
