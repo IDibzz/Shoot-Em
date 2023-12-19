@@ -10,7 +10,7 @@ pygame.init()
 
 WIDTH, HEIGHT = 1920, 1080
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Shoot Em")
+pygame.display.set_caption("Shoot_Em")
 
 BG = pygame.transform.scale(pygame.image.load("grass3.png"), (WIDTH,HEIGHT))
 
@@ -33,7 +33,7 @@ thingy_vel = 3
 thingy_width = 20
 thingy_height = 10
 FONT = pygame.font.SysFont("comicsans", 30)
-
+#renders everything to screen
 def draw(player, Player_moving, thingy, score, orbit_circle_pos, count2, thingy2):
     WIN.blit(BG, (0,0))
     
@@ -63,18 +63,35 @@ def thingy_tracking(player, thingy, thingy_vel):
         dx = player.centerx - thing.centerx
         dy = player.centery - thing.centery
         distance = math.hypot(dx, dy)
-        if distance != 0:  # Avoid division by zero
+        if distance != 0:  
             dx, dy = dx / distance, dy / distance
         thing.x += dx * thingy_vel
         thing.y += dy * thingy_vel
+def thingy_tracking2(player, thingy, thingy_vel):
+    radius = 300
+    
+    for thing in thingy:
+        dx = player.centerx - thing.centerx
+        dy = player.centery - thing.centery
+        distance = math.hypot(dx, dy)
 
+        if distance > radius:
+            if distance != 0:  
+                dx, dy = dx / distance, dy / distance
+            thing.x += dx * thingy_vel
+            thing.y += dy * thingy_vel
+        
+            
+
+#enemy behavior to thingys that have guns (need to add "gun", and radius that they can not pass to player)
 def thingy_2(thingy, player_pos):
     for thing in thingy:
         thingy_pos = thing.centerx, thing.centery
         thingy_projectile.append(add_projectile(thingy_pos, player_pos))
-    
+
+#postition of gun for player
 def gun_position(player, orbit_distance):
-    mx, my = pygame.mouse.get_pos()  # Mouse position
+    mx, my = pygame.mouse.get_pos()  
     angle_to_mouse = math.atan2(my - player.centery, mx - player.centerx)
     orbit_circle_x = int(player.centerx + orbit_distance * math.cos(angle_to_mouse))
     orbit_circle_y = int(player.centery + orbit_distance * math.sin(angle_to_mouse))
@@ -88,6 +105,7 @@ def play_thingy_col(player, thingy, count):
             count += 1
     return count
 
+#checks collisions fo proejctiles from player to thingys and thingy2
 def check_collision(thingies, projectiles, score, thingy_count):
     for thingy in thingies[:]:  
         for projectile in projectiles:
@@ -100,6 +118,7 @@ def check_collision(thingies, projectiles, score, thingy_count):
                 break  
     return score, thingies, thingy_count
 
+#checks if collisions from thingy2 projectile hit player
 def check_player_col(player, thingy_projectile, count2):
     for projectile in  thingy_projectile:
         projectile_rect = pygame.Rect(projectile[0] - 5, projectile[1] - 5, 10, 10)
@@ -110,7 +129,7 @@ def check_player_col(player, thingy_projectile, count2):
                 break  
     return count2
 
-
+#litteraly just add prjectiles to the list to then render on screen
 def add_projectile(player_pos, target_pos):
     dx, dy = target_pos[0] - player_pos[0], target_pos[1] - player_pos[1]
     distance = math.hypot(dx, dy)
@@ -143,7 +162,7 @@ def main():
         orbit_circle_pos = gun_position(player, orbit_distance)
         
         thingy_tracking(player, thingy, thingy_vel)
-        thingy_tracking(player, thingy2, thingy_vel)
+        thingy_tracking2(player, thingy2, thingy_vel)
         
         
         if keys[pygame.K_a] | keys[pygame.K_s] | keys[pygame.K_d] | keys[pygame.K_w]:
@@ -184,6 +203,7 @@ def main():
         score, thingy2, thingy_count = check_collision(thingy2, projectiles, score, thingy_count)
         score, thingy2, thingy_count = check_collision(thingy2, projectiles2, score, thingy_count)
         count2 = check_player_col(player, thingy_projectile, count2)
+        
         if thingy_count < 5:
             
             for _ in range(1):
