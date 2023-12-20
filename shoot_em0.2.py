@@ -36,6 +36,7 @@ class Player(pygame.sprite.Sprite):
         super().__init__()
         self.rect = pygame.Rect(200, HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
         self.velocity = PLAYER_VEL
+        self.player_pos = self.rect.centerx, self.rect.centery
     def move(self, keys):
         if keys[pygame.K_a] and self.rect.x - self.velocity >= 0:
             self.rect.x -= self.velocity
@@ -45,6 +46,9 @@ class Player(pygame.sprite.Sprite):
             self.rect.y -= self.velocity
         if keys[pygame.K_s] and self.rect.y + self.velocity + self.rect.height <= HEIGHT:
             self.rect.y += self.velocity
+    def get_pos(self):
+        return self.player_pos
+
     
 
 class Thingy(pygame.sprite.Sprite):
@@ -53,6 +57,7 @@ class Thingy(pygame.sprite.Sprite):
         self.rect = pygame.Rect(x, y, width, height)
         self.type = type
         self.vel = vel
+        self.thingy_pos = self.rect.centerx, self.rect.centery
 
     def track_player(self, player):
         dx = player.rect.centerx - self.rect.centerx
@@ -62,6 +67,10 @@ class Thingy(pygame.sprite.Sprite):
             dx, dy = dx / distance, dy / distance
         self.rect.x += dx * self.vel
         self.rect.y += dy * self.vel   
+    
+    def get_pos(self):
+        return self.thingy_pos
+    
 
 class Projectile(pygame.sprite.Sprite):
     def __init__(self, x, y, dx, dy, speed):
@@ -88,9 +97,11 @@ class ShootEmGame:
         self.player = Player()
         self.thingy = []
         self.projectiles = []
+        self.projectiles2 = []
         self.score = 0
         self.count = 0
         self.last_shot_time = 0
+        self.last_shot_time2 = 0
         self.shot_delay = 1000
         self.spawn_timer = 0
         self.enemy_count = 0
@@ -111,7 +122,7 @@ class ShootEmGame:
 
             for thing in self.thingy:
                 Thingy.track_player(thing, self.player)
-            
+                
             Player.move(self.player, keys)
             
             for event in pygame.event.get():
@@ -120,6 +131,14 @@ class ShootEmGame:
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     self.handle_shooting(player_moving)
                     
+            
+            current_time2 = pygame.time.get_ticks()
+            if current_time2 - self.last_shot_time2 >= 1000:
+                self.last_shot_time2 = current_time2
+                self.thingy_shooting()
+                
+            
+            
             self.update_projectiles()
             self.check_collisions()
             self.play_thingy_col()
@@ -143,6 +162,19 @@ class ShootEmGame:
             projectile.move()
             if projectile.x < 0 or projectile.x > WIDTH or projectile.y < 0 or projectile.y > HEIGHT:
                 self.projectiles.remove(projectile)
+        for projectile in self.projectiles2:
+            projectile.move()
+            if projectile.x < 0 or projectile.x > WIDTH or projectile.y < 0 or projectile.y > HEIGHT:
+                self.projectiles2.remove(projectile)
+    
+    def thingy_shooting(self):
+        for thing in self.thingy:
+            if thing.type == 'shooter':
+                target_pos = self.player.rect.centerx, self.player.rect.centery
+                starting_pos = thing.rect.centerx, thing.rect.centery
+                self.projectiles2.append(self.create_projectile(starting_pos, target_pos, 5))
+        
+
 
     def handle_shooting(self, player_moving):
         current_time = pygame.time.get_ticks()
@@ -183,13 +215,19 @@ class ShootEmGame:
                     self.score += 1
                     self.enemy_count -= 1
                     break 
-        
+        for projectile in self.projectiles2[:]:
+            projectile_rect2 = pygame.Rect(projectile.x - 5, projectile.y - 5, 10, 10)
+            if projectile_rect2.colliderect(self.player.rect):
+                self.projectiles2.remove(projectile)
+                self.count += 1
+                break 
+
     def spawn_enemies(self):
         self.spawn_timer += 1
         if self.spawn_timer >= 1 and self.enemy_count < 5:
             x = random.randint(0, WIDTH - thingy_width)
             y = random.randint(0, HEIGHT - thingy_height)
-            type = 'normal' #if random.randint(0, 1) == 0 else 'shooter'
+            type = 'normal' if random.randint(0, 1) == 0 else 'shooter'
             enemy = Thingy(x, y, thingy_width, thingy_height, thingy_vel, type)
             self.thingy.append(enemy)
             self.enemy_count += 1
@@ -203,8 +241,12 @@ class ShootEmGame:
             pygame.draw.rect(self.win, "blue" if enemy.type == 'normal' else "black", enemy.rect)
         for projectile in self.projectiles:
             projectile.draw(self.win)
+        for projectile in self.projectiles2:
+            projectile.draw(self.win)
+        version_text = FONT.render("Version 0.2", 1, "white")
         count_text = FONT.render(str(self.count), 1, "white")
         score_text = FONT.render(str(self.score), 1, "white")
+        self.win.blit(version_text, (1750, 10))
         self.win.blit(score_text, (10, 10))
         self.win.blit(count_text, (10, 40))
         pygame.display.update()
@@ -215,22 +257,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
