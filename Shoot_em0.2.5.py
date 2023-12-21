@@ -98,7 +98,31 @@ class Thingy(pygame.sprite.Sprite):
                 self.rect.topleft = original_position
                 # Implement logic to navigate around the barrier
                 self.navigate_around_barrier(barrier)
+    
+    def line_intersects_line(self, line1_start, line1_end, line2_start, line2_end):
+        def ccw(A, B, C):
+            return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
 
+        A, B = line1_start, line1_end
+        C, D = line2_start, line2_end
+
+        return ccw(A, C, D) != ccw(B, C, D) and ccw(A, B, C) != ccw(A, B, D)
+
+    def line_intersects_rect(self, line_start, line_end, rect):
+        # Check if line intersects with any of the four sides of the rectangle
+        return (
+            self.line_intersects_line(line_start, line_end, rect.topleft, rect.topright) or
+            self.line_intersects_line(line_start, line_end, rect.topleft, rect.bottomleft) or
+            self.line_intersects_line(line_start, line_end, rect.bottomleft, rect.bottomright) or
+            self.line_intersects_line(line_start, line_end, rect.topright, rect.bottomright)
+        )
+    
+    def can_see_player(self, player, barriers):
+        line_start = self.rect.center
+        line_end = player.rect.center
+
+        # Check for line of sight
+        return not any(self.line_intersects_rect(line_start, line_end, barrier.rect) for barrier in barriers)
     def navigate_around_barrier(self, barrier):
         # This is a simple navigation logic. You can enhance it based on your game's needs.
         if self.rect.centerx < barrier.rect.centerx:
@@ -132,7 +156,18 @@ class Thingy(pygame.sprite.Sprite):
                 
                 self.rect.x += dx * self.vel
                 self.rect.y += dy * self.vel
-    
+    def in_reach(self, player):
+        
+            radius = 300
+            dx = player.rect.centerx - self.rect.centerx
+            dy = player.rect.centery - self.rect.centery
+            distance = math.hypot(dx, dy)
+            if distance > radius:
+                inreach = True
+                return inreach
+            else:
+                inreach = False
+                return inreach
     def avoid_others(self, all_thingies):
         for other in all_thingies:
             if other != self and self.rect.colliderect(other.rect):
@@ -224,6 +259,7 @@ class ShootEmGame:
         current_time = pygame.time.get_ticks()
         grid = self.create_grid(WIDTH, HEIGHT, self.barriers, 40)
         run = True
+        inreach = False
 
         while run:
             clock.tick(60)
@@ -233,9 +269,12 @@ class ShootEmGame:
             self.spawn_enemies()
             
             for thing in self.thingy:
+                
+                
                 if thing.is_close_to_barrier(self.barriers):
                     thing.avoid_others(self.thingy)
                     self.update(self.player, grid, 40, thing)
+                    
                 else:
                     thing.avoid_others(self.thingy)
                     if thing.type == 'normal':
@@ -264,6 +303,7 @@ class ShootEmGame:
             self.play_thingy_col()
             self.draw()
     
+
     def update(self, player, grid, cell_size, thing):
         start = (thing.rect.x // cell_size, thing.rect.y // cell_size)
         goal = (player.rect.x // cell_size, player.rect.y // cell_size)
@@ -368,10 +408,11 @@ class ShootEmGame:
     
     def thingy_shooting(self):
         for thing in self.thingy:
-            if thing.type == 'shooter':
-                target_pos = self.player.rect.centerx, self.player.rect.centery
-                starting_pos = thing.rect.centerx, thing.rect.centery
-                self.projectiles2.append(self.create_projectile(starting_pos, target_pos, 5))
+            if thing.can_see_player(self.player, self.barriers):
+                if thing.type == 'shooter':
+                    target_pos = self.player.rect.centerx, self.player.rect.centery
+                    starting_pos = thing.rect.centerx, thing.rect.centery
+                    self.projectiles2.append(self.create_projectile(starting_pos, target_pos, 5))
         
 
 
@@ -449,7 +490,7 @@ class ShootEmGame:
             projectile.draw(self.win)
         for projectile in self.projectiles2:
             projectile.draw(self.win)
-        version_text = FONT.render("Version 0.2", 1, "white")
+        version_text = FONT.render("Version 0.2.5", 1, "white")
         count_text = FONT.render(str(self.count), 1, "white")
         score_text = FONT.render(str(self.score), 1, "white")
         self.win.blit(version_text, (1650, 40))
