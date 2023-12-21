@@ -41,6 +41,8 @@ def draw(player, Player_moving, thingy, score, orbit_circle_pos, count2, thingy2
     pygame.draw.circle(WIN, (0, 255, 0), orbit_circle_pos, 10)
     
     pygame.draw.rect(WIN, "red", player)
+    version_text = FONT.render("Version 0.1", 1, "white")
+    WIN.blit(version_text, (1750, 10))
     collisions = FONT.render(str(count2), 1, "white")
     score_text = FONT.render(str(score), 1, "white")
     WIN.blit(score_text, (10,10))

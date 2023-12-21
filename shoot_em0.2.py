@@ -8,6 +8,8 @@ import math
 
 
 
+
+
 pygame.font.init()
 pygame.init()
 
@@ -34,20 +36,43 @@ FONT = pygame.font.SysFont("comicsans", 30)
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.rect = pygame.Rect(200, HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
+        self.rect = pygame.Rect(200, HEIGHT - 500, PLAYER_WIDTH, PLAYER_HEIGHT)
         self.velocity = PLAYER_VEL
         self.player_pos = self.rect.centerx, self.rect.centery
-    def move(self, keys):
-        if keys[pygame.K_a] and self.rect.x - self.velocity >= 0:
+        self.is_paused = False
+    def move(self, keys, barriers):
+        if keys[pygame.K_a]:  # Move left
             self.rect.x -= self.velocity
-        if keys[pygame.K_d] and self.rect.x + self.velocity + self.rect.width <= WIDTH:
+            if any(self.rect.colliderect(barrier.rect) for barrier in barriers):
+                self.rect.x += self.velocity  # Undo movement if collision
+
+        if keys[pygame.K_d]:  # Move right
             self.rect.x += self.velocity
-        if keys[pygame.K_w] and self.rect.y - self.velocity >= 0:
+            if any(self.rect.colliderect(barrier.rect) for barrier in barriers):
+                self.rect.x -= self.velocity  # Undo movement if collision
+
+        if keys[pygame.K_w]:  # Move up
             self.rect.y -= self.velocity
-        if keys[pygame.K_s] and self.rect.y + self.velocity + self.rect.height <= HEIGHT:
+            if any(self.rect.colliderect(barrier.rect) for barrier in barriers):
+                self.rect.y += self.velocity  # Undo movement if collision
+
+        if keys[pygame.K_s]:  # Move down
             self.rect.y += self.velocity
+            if any(self.rect.colliderect(barrier.rect) for barrier in barriers):
+                self.rect.y -= self.velocity  # Undo movement if collision
+            
+        
     def get_pos(self):
         return self.player_pos
+    def barrier_collision(self, barriers):
+        for barrier in barriers:
+            temp = self.rect.topleft
+            if self.rect.colliderect(barrier.rect):
+                self.player_collison_bar = True
+                self.rect = pygame.Rect(temp, PLAYER_WIDTH, PLAYER_HEIGHT)
+            
+        
+     
 
     
 
@@ -58,6 +83,8 @@ class Thingy(pygame.sprite.Sprite):
         self.type = type
         self.vel = vel
         self.thingy_pos = self.rect.centerx, self.rect.centery
+        self.orbit_angle = 0
+        
 
     def track_player(self, player):
         dx = player.rect.centerx - self.rect.centerx
@@ -68,6 +95,41 @@ class Thingy(pygame.sprite.Sprite):
         self.rect.x += dx * self.vel
         self.rect.y += dy * self.vel   
     
+    def track_player_shooter(self, player):
+        if self.type == 'shooter':
+            inreach = False
+            radius = 300
+            dx = player.rect.centerx - self.rect.centerx
+            dy = player.rect.centery - self.rect.centery
+            distance = math.hypot(dx, dy)
+
+            if distance > radius:
+                if distance != 0:  
+                    dx, dy = dx / distance, dy / distance
+                
+                self.rect.x += dx * self.vel
+                self.rect.y += dy * self.vel
+    
+    def avoid_others(self, all_thingies):
+        for other in all_thingies:
+            if other != self and self.rect.colliderect(other.rect):
+                dx = self.rect.centerx - other.rect.centerx
+                dy = self.rect.centery - other.rect.centery
+                distance = math.hypot(dx, dy)
+                if distance == 0:
+                    continue  # Avoid division by zero
+                dx, dy = dx / distance, dy / distance
+                self.rect.x += dx * self.vel
+                self.rect.y += dy * self.vel
+    
+    def orbit_player(self, player, orbit_radius, orbit_speed):
+        if self.type == 'shooter':
+            # Increment the angle to move along the orbit
+            self.orbit_angle += orbit_speed
+            # Calculate new position
+            self.rect.x = player.rect.centerx + math.cos(self.orbit_angle) * orbit_radius - self.rect.width / 2
+            self.rect.y = player.rect.centery + math.sin(self.orbit_angle) * orbit_radius - self.rect.height / 2
+
     def get_pos(self):
         return self.thingy_pos
     
@@ -88,6 +150,15 @@ class Projectile(pygame.sprite.Sprite):
     def draw(self, surface):
         pygame.draw.circle(surface, "red", (int(self.x), int(self.y)), 5)
 
+class Barrier(pygame.sprite.Sprite):
+    def __init__(self, x, y, width, height):
+        super().__init__()
+        self.rect = pygame.Rect(x, y, width, height)
+        self.color = 'white'
+    def draw(self, window):
+        pygame.draw.rect(window, self.color, self.rect)
+
+
 class ShootEmGame:
     def __init__(self):
         self.win = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -98,6 +169,13 @@ class ShootEmGame:
         self.thingy = []
         self.projectiles = []
         self.projectiles2 = []
+        self.barriers = [
+            Barrier(0, 0, WIDTH, 10),  
+            Barrier(0, HEIGHT - 10, WIDTH, 10),  
+            Barrier(0, 0, 10, HEIGHT),  
+            Barrier(WIDTH - 10, 0, 10, HEIGHT),  
+            Barrier(200, 200, 30, 80)
+        ]
         self.score = 0
         self.count = 0
         self.last_shot_time = 0
@@ -121,9 +199,15 @@ class ShootEmGame:
             self.spawn_enemies()
 
             for thing in self.thingy:
-                Thingy.track_player(thing, self.player)
+                thing.avoid_others(self.thingy)
+                if thing.type == 'normal':
+                    Thingy.track_player(thing, self.player)
+                else:
+                    Thingy.track_player_shooter(thing, self.player)
+                    #thing.orbit_player(self.player, orbit_radius=300, orbit_speed=0.005)  # adjust radius and speed as needed
+
                 
-            Player.move(self.player, keys)
+            self.player.move(keys, self.barriers)
             
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -147,7 +231,10 @@ class ShootEmGame:
     def play_thingy_col(self):
         for thing in self.thingy:
             if self.player.rect.colliderect(thing):
+                self.thingy.remove(thing)
+                self.enemy_count -= 1
                 self.count += 1
+
         
 
     def check_player_movement(self, keys):
@@ -237,6 +324,8 @@ class ShootEmGame:
         self.win.blit(self.bg, (0, 0))
         pygame.draw.rect(self.win, "red", self.player.rect)
         pygame.draw.circle(WIN, (0, 255, 0), self.gun_position(), 10)
+        for barrier in self.barriers:
+            barrier.draw(self.win)
         for enemy in self.thingy:
             pygame.draw.rect(self.win, "blue" if enemy.type == 'normal' else "black", enemy.rect)
         for projectile in self.projectiles:
@@ -246,9 +335,9 @@ class ShootEmGame:
         version_text = FONT.render("Version 0.2", 1, "white")
         count_text = FONT.render(str(self.count), 1, "white")
         score_text = FONT.render(str(self.score), 1, "white")
-        self.win.blit(version_text, (1750, 10))
-        self.win.blit(score_text, (10, 10))
-        self.win.blit(count_text, (10, 40))
+        self.win.blit(version_text, (1700, 10))
+        self.win.blit(score_text, (20, 10))
+        self.win.blit(count_text, (20, 40))
         pygame.display.update()
 
 def main():
