@@ -5,6 +5,7 @@ import json
 import os
 import re
 import math
+import heapq
 
 
 
@@ -85,7 +86,29 @@ class Thingy(pygame.sprite.Sprite):
         self.thingy_pos = self.rect.centerx, self.rect.centery
         self.orbit_angle = 0
         
+    def move_with_collision(self, barriers):
+        # Store original position
+        original_position = self.rect.topleft
 
+
+        # Check for collisions with barriers
+        for barrier in barriers:
+            if self.rect.colliderect(barrier.rect):
+                # Collision detected, move back to original position
+                self.rect.topleft = original_position
+                # Implement logic to navigate around the barrier
+                self.navigate_around_barrier(barrier)
+
+    def navigate_around_barrier(self, barrier):
+        # This is a simple navigation logic. You can enhance it based on your game's needs.
+        if self.rect.centerx < barrier.rect.centerx:
+            self.rect.x -= self.vel
+        else:
+            self.rect.x += self.vel
+        if self.rect.centery < barrier.rect.centery:
+            self.rect.y -= self.vel
+        else:
+            self.rect.y += self.vel
     def track_player(self, player):
         dx = player.rect.centerx - self.rect.centerx
         dy = player.rect.centery - self.rect.centery
@@ -129,7 +152,17 @@ class Thingy(pygame.sprite.Sprite):
             # Calculate new position
             self.rect.x = player.rect.centerx + math.cos(self.orbit_angle) * orbit_radius - self.rect.width / 2
             self.rect.y = player.rect.centery + math.sin(self.orbit_angle) * orbit_radius - self.rect.height / 2
+    def is_close_to_barrier(self, barriers, threshold=80):
+        for barrier in barriers:
+            # Calculate the distance between the closest edges of the Thingy and the barrier
+            distance_x = max(barrier.rect.left - self.rect.right, self.rect.left - barrier.rect.right, 0)
+            distance_y = max(barrier.rect.top - self.rect.bottom, self.rect.top - barrier.rect.bottom, 0)
 
+            distance = math.sqrt(distance_x ** 2 + distance_y ** 2)
+
+            if distance <= threshold:
+                return True  # Thingy is within threshold distance of a barrier
+        return False  # Thingy is not close to any barrier
     def get_pos(self):
         return self.thingy_pos
     
@@ -142,7 +175,7 @@ class Projectile(pygame.sprite.Sprite):
         self.dx = dx
         self.dy = dy
         self.speed = speed
-
+    
     def move(self):
         self.x += self.dx * self.speed
         self.y += self.dy * self.speed
@@ -170,11 +203,11 @@ class ShootEmGame:
         self.projectiles = []
         self.projectiles2 = []
         self.barriers = [
-            Barrier(0, 0, WIDTH, 10),  
-            Barrier(0, HEIGHT - 10, WIDTH, 10),  
-            Barrier(0, 0, 10, HEIGHT),  
-            Barrier(WIDTH - 10, 0, 10, HEIGHT),  
-            Barrier(200, 200, 30, 80)
+            Barrier(0, 0, WIDTH, 40),  
+            Barrier(0, HEIGHT - 40, WIDTH, 40),  
+            Barrier(0, 0, 40, HEIGHT),  
+            Barrier(WIDTH - 40, 0, 40, HEIGHT),  
+            Barrier(200,200, 200, 200)
         ]
         self.score = 0
         self.count = 0
@@ -183,12 +216,13 @@ class ShootEmGame:
         self.shot_delay = 1000
         self.spawn_timer = 0
         self.enemy_count = 0
+        self.within_dis = False
           
 
     def run(self):
         clock = pygame.time.Clock()
         current_time = pygame.time.get_ticks()
-        
+        grid = self.create_grid(WIDTH, HEIGHT, self.barriers, 40)
         run = True
 
         while run:
@@ -197,14 +231,32 @@ class ShootEmGame:
             player_moving = self.check_player_movement(keys)
             
             self.spawn_enemies()
+            
+            for thing in self.thingy:
+                if thing.is_close_to_barrier(self.barriers):
+                    thing.avoid_others(self.thingy)
+                    self.update(self.player, grid, 40, thing)
+                else:
+                    thing.avoid_others(self.thingy)
+                    if thing.type == 'normal':
+                        Thingy.track_player(thing, self.player)
+                    else:
+                        Thingy.track_player_shooter(thing, self.player)
+                        #thing.orbit_player(self.player, orbit_radius=300, orbit_speed=0.005)  # adjust radius and speed as needed
 
+            '''for thing in self.thingy:
+                self.update(self.player, grid, 40, thing)
+            
             for thing in self.thingy:
                 thing.avoid_others(self.thingy)
                 if thing.type == 'normal':
                     Thingy.track_player(thing, self.player)
                 else:
                     Thingy.track_player_shooter(thing, self.player)
-                    #thing.orbit_player(self.player, orbit_radius=300, orbit_speed=0.005)  # adjust radius and speed as needed
+                    #thing.orbit_player(self.player, orbit_radius=300, orbit_speed=0.005)  # adjust radius and speed as needed'''
+            
+            
+                
 
                 
             self.player.move(keys, self.barriers)
@@ -227,15 +279,91 @@ class ShootEmGame:
             self.check_collisions()
             self.play_thingy_col()
             self.draw()
+    
+    def update(self, player, grid, cell_size, thing):
+        start = (thing.rect.x // cell_size, thing.rect.y // cell_size)
+        goal = (player.rect.x // cell_size, player.rect.y // cell_size)
+        path = self.a_star_search(grid, start, goal)
+        if path and len(path) > 1:  # Check if a path exists and has more than one point
+            # Move towards the next point on the path
+            next_cell = path[1]  # path[0] is the current cell, so we look at path[1]
+            next_x, next_y = next_cell[0] * cell_size, next_cell[1] * cell_size
 
+            # Adjust thingy's position to move towards next cell
+            if thing.rect.x < next_x:
+                thing.rect.x += min(thing.vel, next_x - thing.rect.x)
+            elif thing.rect.x > next_x:
+                thing.rect.x -= min(thing.vel, thing.rect.x - next_x)
+            
+            if thing.rect.y < next_y:
+                thing.rect.y += min(thing.vel, next_y - thing.rect.y)
+            elif thing.rect.y > next_y:
+                thing.rect.y -= min(thing.vel, thing.rect.y - next_y)
+    
+    def create_grid(self, width, height, barriers, cell_size):
+        grid = [[0 for _ in range(height // cell_size)] for _ in range(width // cell_size)]
+        for barrier in barriers:
+            x_start = barrier.rect.x // cell_size
+            y_start = barrier.rect.y // cell_size
+            x_end = (barrier.rect.x + barrier.rect.width) // cell_size
+            y_end = (barrier.rect.y + barrier.rect.height) // cell_size
+            for x in range(x_start, x_end):
+                for y in range(y_start, y_end):
+                    grid[x][y] = 1  # Mark barrier cells as blocked
+        return grid
+    def heuristic(self, a, b):
+        return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+    def a_star_search(self, grid, start, goal):
+        # Priority queue
+        frontier = []
+        heapq.heappush(frontier, (0, start))
+        
+        came_from = {start: None}
+        cost_so_far = {start: 0}
+
+        while frontier:
+            current = heapq.heappop(frontier)[1]
+
+            if current == goal:
+                break
+
+            for next in self.neighbors(grid, current):
+                new_cost = cost_so_far[current] + 1
+                if next not in cost_so_far or new_cost < cost_so_far[next]:
+                    cost_so_far[next] = new_cost
+                    priority = new_cost + self.heuristic(goal, next)
+                    heapq.heappush(frontier, (priority, next))
+                    came_from[next] = current
+
+        return self.reconstruct_path(came_from, start, goal)
+
+    def neighbors(self, grid, node):
+        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # Four directions: up, right, down, left
+        result = []
+        for dir in directions:
+            next = (node[0] + dir[0], node[1] + dir[1])
+            if 0 <= next[0] < len(grid) and 0 <= next[1] < len(grid[0]) and grid[next[0]][next[1]] == 0:
+                result.append(next)
+        return result
+
+    def reconstruct_path(self, came_from, start, goal):
+        path = []
+        current = goal
+        while current != start:
+            if current not in came_from:
+                return []  # Return an empty path if the goal is unreachable
+            path.append(current)
+            current = came_from[current]
+        path.append(start)  # Optional
+        path.reverse()  # Optional
+        return path
     def play_thingy_col(self):
         for thing in self.thingy:
             if self.player.rect.colliderect(thing):
                 self.thingy.remove(thing)
                 self.enemy_count -= 1
                 self.count += 1
-
-        
 
     def check_player_movement(self, keys):
         if keys[pygame.K_a] | keys[pygame.K_s] | keys[pygame.K_d] | keys[pygame.K_w]:
@@ -302,13 +430,18 @@ class ShootEmGame:
                     self.score += 1
                     self.enemy_count -= 1
                     break 
+            for barrier in self.barriers:
+                if projectile_rect.colliderect(barrier.rect):
+                    self.projectiles.remove(projectile)
         for projectile in self.projectiles2[:]:
             projectile_rect2 = pygame.Rect(projectile.x - 5, projectile.y - 5, 10, 10)
             if projectile_rect2.colliderect(self.player.rect):
                 self.projectiles2.remove(projectile)
                 self.count += 1
                 break 
-
+            for barrier in self.barriers:
+                if projectile_rect2.colliderect(barrier.rect):
+                    self.projectiles2.remove(projectile)
     def spawn_enemies(self):
         self.spawn_timer += 1
         if self.spawn_timer >= 1 and self.enemy_count < 5:
@@ -335,9 +468,9 @@ class ShootEmGame:
         version_text = FONT.render("Version 0.2", 1, "white")
         count_text = FONT.render(str(self.count), 1, "white")
         score_text = FONT.render(str(self.score), 1, "white")
-        self.win.blit(version_text, (1700, 10))
-        self.win.blit(score_text, (20, 10))
-        self.win.blit(count_text, (20, 40))
+        self.win.blit(version_text, (1650, 40))
+        self.win.blit(score_text, (60, 40))
+        self.win.blit(count_text, (60, 70))
         pygame.display.update()
 
 def main():
