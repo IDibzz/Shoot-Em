@@ -28,7 +28,7 @@ thingy_projectile = []
 projectile_color = (255, 0, 0)
 projectile_speed = 5
 projectile_speed2 = 10
-thingy_vel = 3
+thingy_vel = 2
 thingy_width = 20
 thingy_height = 10
 thingy_count = 0
@@ -85,7 +85,12 @@ class Thingy(pygame.sprite.Sprite):
         self.vel = vel
         self.thingy_pos = self.rect.centerx, self.rect.centery
         self.orbit_angle = 0
-        
+    def thing_barrier_col(self, barriers):
+        for barrier in barriers:
+            if self.rect.colliderect(barrier):
+                return True
+            else:
+                return False
     def move_with_collision(self, barriers):
         # Store original position
         original_position = self.rect.topleft
@@ -124,7 +129,7 @@ class Thingy(pygame.sprite.Sprite):
         # Check for line of sight
         return not any(self.line_intersects_rect(line_start, line_end, barrier.rect) for barrier in barriers)
     def navigate_around_barrier(self, barrier):
-        # This is a simple navigation logic. You can enhance it based on your game's needs.
+        
         if self.rect.centerx < barrier.rect.centerx:
             self.rect.x -= self.vel
         else:
@@ -157,17 +162,13 @@ class Thingy(pygame.sprite.Sprite):
                 self.rect.x += dx * self.vel
                 self.rect.y += dy * self.vel
     def in_reach(self, player):
-        
-            radius = 300
-            dx = player.rect.centerx - self.rect.centerx
-            dy = player.rect.centery - self.rect.centery
-            distance = math.hypot(dx, dy)
-            if distance > radius:
-                inreach = True
-                return inreach
-            else:
-                inreach = False
-                return inreach
+        radius = 300
+        dx = player.rect.centerx - self.rect.centerx
+        dy = player.rect.centery - self.rect.centery
+        distance = math.hypot(dx, dy)
+        return distance > radius
+                
+             
     def avoid_others(self, all_thingies):
         for other in all_thingies:
             if other != self and self.rect.colliderect(other.rect):
@@ -219,10 +220,10 @@ class Projectile(pygame.sprite.Sprite):
         pygame.draw.circle(surface, "red", (int(self.x), int(self.y)), 5)
 
 class Barrier(pygame.sprite.Sprite):
-    def __init__(self, x, y, width, height):
+    def __init__(self, x, y, width, height, color):
         super().__init__()
         self.rect = pygame.Rect(x, y, width, height)
-        self.color = 'white'
+        self.color = color
     def draw(self, window):
         pygame.draw.rect(window, self.color, self.rect)
 
@@ -238,11 +239,17 @@ class ShootEmGame:
         self.projectiles = []
         self.projectiles2 = []
         self.barriers = [
-            Barrier(0, 0, WIDTH, 40),  
-            Barrier(0, HEIGHT - 40, WIDTH, 40),  
-            Barrier(0, 0, 40, HEIGHT),  
-            Barrier(WIDTH - 40, 0, 40, HEIGHT),  
-            Barrier(200,200, 200, 200)
+            Barrier(0, 0, WIDTH, 40, 'white'),  
+            Barrier(0, HEIGHT - 40, WIDTH, 40, 'white'),  
+            Barrier(0, 0, 40, HEIGHT, 'white'),  
+            Barrier(WIDTH - 40, 0, 40, HEIGHT, 'white'),  
+            Barrier(400,400, 200, 200, 'white')
+        ]
+        self.barriers2 = [
+            Barrier(360, 360, 40, 280, 'yellow'), #Barrier(380, 380, 20, 240, 'yellow')
+            Barrier(600, 360, 40, 280, 'yellow'), #Barrier(600, 380, 20, 240, 'yellow')
+            Barrier(400, 360, 200, 40, 'yellow'), #Barrier(400, 380, 200, 20, 'yellow')
+            Barrier(400, 600, 200, 40, 'yellow')  #Barrier(400, 600, 200, 20, 'yellow')
         ]
         self.score = 0
         self.count = 0
@@ -257,7 +264,7 @@ class ShootEmGame:
     def run(self):
         clock = pygame.time.Clock()
         current_time = pygame.time.get_ticks()
-        grid = self.create_grid(WIDTH, HEIGHT, self.barriers, 40)
+        grid = self.create_grid(WIDTH, HEIGHT, self.barriers, 10)
         run = True
         inreach = False
 
@@ -269,18 +276,21 @@ class ShootEmGame:
             self.spawn_enemies()
             
             for thing in self.thingy:
-                
-                
-                if thing.is_close_to_barrier(self.barriers):
-                    thing.avoid_others(self.thingy)
+                thing.avoid_others(self.thingy)
+                if thing.type == 'shooter' and (not thing.can_see_player(self.player, self.barriers) or thing.in_reach(self.player)):
+                    self.update(self.player, grid, 10, thing)
+                elif thing.type == 'normal':
+                    self.update(self.player, grid, 10, thing)
+                '''if thing.is_close_to_barrier(self.barriers):
+                    #thing.avoid_others(self.thingy)
                     self.update(self.player, grid, 40, thing)
-                    
+                # create second barrier that dont have collision with tracking but still work with smart tracking on the outerside of the in game barriers
                 else:
-                    thing.avoid_others(self.thingy)
+                    #thing.avoid_others(self.thingy)
                     if thing.type == 'normal':
                         Thingy.track_player(thing, self.player)
                     else:
-                        Thingy.track_player_shooter(thing, self.player)
+                        Thingy.track_player_shooter(thing, self.player)'''
                         
             self.player.move(keys, self.barriers)
             
@@ -323,7 +333,8 @@ class ShootEmGame:
                 thing.rect.y += min(thing.vel, next_y - thing.rect.y)
             elif thing.rect.y > next_y:
                 thing.rect.y -= min(thing.vel, thing.rect.y - next_y)
-    
+        else:
+            thing.track_player(self.player)
     def create_grid(self, width, height, barriers, cell_size):
         grid = [[0 for _ in range(height // cell_size)] for _ in range(width // cell_size)]
         for barrier in barriers:
@@ -363,14 +374,22 @@ class ShootEmGame:
         return self.reconstruct_path(came_from, start, goal)
 
     def neighbors(self, grid, node):
-        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # Four directions: up, right, down, left
+        directions = [
+        (0, 1),  # Up
+        (1, 0),  # Right
+        (0, -1), # Down
+        (-1, 0), # Left
+        (1, 1),  # Diagonal up-right
+        (1, -1), # Diagonal down-right
+        (-1, -1),# Diagonal down-left
+        (-1, 1)  # Diagonal up-left
+        ]
         result = []
         for dir in directions:
             next = (node[0] + dir[0], node[1] + dir[1])
             if 0 <= next[0] < len(grid) and 0 <= next[1] < len(grid[0]) and grid[next[0]][next[1]] == 0:
                 result.append(next)
         return result
-
     def reconstruct_path(self, came_from, start, goal):
         path = []
         current = goal
@@ -470,8 +489,8 @@ class ShootEmGame:
     def spawn_enemies(self):
         self.spawn_timer += 1
         if self.spawn_timer >= 1 and self.enemy_count < 5:
-            x = random.randint(0, WIDTH - thingy_width)
-            y = random.randint(0, HEIGHT - thingy_height)
+            x = random.randint(0, WIDTH - thingy_width - 40)
+            y = random.randint(0, HEIGHT - thingy_height - 40)
             type = 'normal' if random.randint(0, 1) == 0 else 'shooter'
             enemy = Thingy(x, y, thingy_width, thingy_height, thingy_vel, type)
             self.thingy.append(enemy)
@@ -484,6 +503,8 @@ class ShootEmGame:
         pygame.draw.circle(WIN, (0, 255, 0), self.gun_position(), 10)
         for barrier in self.barriers:
             barrier.draw(self.win)
+        #for barrier in self.barriers2:
+        #    barrier.draw(self.win)
         for enemy in self.thingy:
             pygame.draw.rect(self.win, "blue" if enemy.type == 'normal' else "black", enemy.rect)
         for projectile in self.projectiles:
