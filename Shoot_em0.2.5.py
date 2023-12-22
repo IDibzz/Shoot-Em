@@ -440,7 +440,7 @@ class ShootEmGame:
                     random_offset_y = random.randint(-randomness, randomness)
                     randomized_target_pos = (self.player.rect.centerx + random_offset_x, self.player.rect.centery + random_offset_y)
                     self.projectiles2.append(self.create_projectile(gun_position, randomized_target_pos, 5))
-                    thing.shooting_delay = random.randint(500, 1500)  # Adjust these values as needed
+                    thing.shooting_delay = random.randint(500, 1500)  
                     thing.shooting_timer = thing.shooting_delay
     
     def thingy_gun_position(self):
@@ -484,7 +484,7 @@ class ShootEmGame:
         return Projectile(start_pos[0], start_pos[1], dx, dy, speed)
 
     def check_collisions(self):
-        # Check for projectile collisions with enemies
+        collision_check = False
         for projectile in self.projectiles[:]:
             projectile_rect = pygame.Rect(projectile.x - 5, projectile.y - 5, 10, 10)
             for enemy in self.thingy[:]:
@@ -493,9 +493,12 @@ class ShootEmGame:
                     self.thingy.remove(enemy)
                     self.score += 1
                     self.enemy_count -= 1
+                    collision_check = True
                     break 
+                else:
+                    collision_check = False
             for barrier in self.barriers:
-                if projectile_rect.colliderect(barrier.rect):
+                if projectile_rect.colliderect(barrier.rect) and not collision_check:
                     self.projectiles.remove(projectile)
         for projectile in self.projectiles2[:]:
             projectile_rect2 = pygame.Rect(projectile.x - 5, projectile.y - 5, 10, 10)
