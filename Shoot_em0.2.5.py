@@ -61,6 +61,7 @@ class Player(pygame.sprite.Sprite):
             self.rect.y += self.velocity
             if any(self.rect.colliderect(barrier.rect) for barrier in barriers):
                 self.rect.y -= self.velocity  # Undo movement if collision
+        self.player_pos = self.rect.centerx, self.rect.centery
             
         
     def get_pos(self):
@@ -85,6 +86,15 @@ class Thingy(pygame.sprite.Sprite):
         self.vel = vel
         self.thingy_pos = self.rect.centerx, self.rect.centery
         self.orbit_angle = 0
+        self.shooting_delay = random.randint(500, 1500)  # Random delay between 500ms and 1500ms
+        self.shooting_timer = 0
+    def update_shooting_timer(self, dt):
+        if self.shooting_timer > 0:
+            self.shooting_timer -= dt
+
+    def ready_to_shoot(self):
+        return self.shooting_timer <= 0
+    
     def thing_barrier_col(self, barriers):
         for barrier in barriers:
             if self.rect.colliderect(barrier):
@@ -199,6 +209,7 @@ class Thingy(pygame.sprite.Sprite):
             if distance <= threshold:
                 return True  # Thingy is within threshold distance of a barrier
         return False  # Thingy is not close to any barrier
+    
     def get_pos(self):
         return self.thingy_pos
     
@@ -269,7 +280,7 @@ class ShootEmGame:
         inreach = False
 
         while run:
-            clock.tick(60)
+            dt = clock.tick(60)
             keys = pygame.key.get_pressed()
             player_moving = self.check_player_movement(keys)
             
@@ -281,16 +292,6 @@ class ShootEmGame:
                     self.update(self.player, grid, 10, thing)
                 elif thing.type == 'normal':
                     self.update(self.player, grid, 10, thing)
-                '''if thing.is_close_to_barrier(self.barriers):
-                    #thing.avoid_others(self.thingy)
-                    self.update(self.player, grid, 40, thing)
-                # create second barrier that dont have collision with tracking but still work with smart tracking on the outerside of the in game barriers
-                else:
-                    #thing.avoid_others(self.thingy)
-                    if thing.type == 'normal':
-                        Thingy.track_player(thing, self.player)
-                    else:
-                        Thingy.track_player_shooter(thing, self.player)'''
                         
             self.player.move(keys, self.barriers)
             
@@ -301,10 +302,8 @@ class ShootEmGame:
                     self.handle_shooting(player_moving)
                     
             
-            current_time2 = pygame.time.get_ticks()
-            if current_time2 - self.last_shot_time2 >= 1000:
-                self.last_shot_time2 = current_time2
-                self.thingy_shooting()
+            
+            self.thingy_shooting(dt)
                 
             
             
@@ -425,16 +424,37 @@ class ShootEmGame:
             if projectile.x < 0 or projectile.x > WIDTH or projectile.y < 0 or projectile.y > HEIGHT:
                 self.projectiles2.remove(projectile)
     
-    def thingy_shooting(self):
+    def thingy_shooting(self, dt):
         for thing in self.thingy:
-            if thing.can_see_player(self.player, self.barriers):
-                if thing.type == 'shooter':
-                    target_pos = self.player.rect.centerx, self.player.rect.centery
-                    starting_pos = thing.rect.centerx, thing.rect.centery
-                    self.projectiles2.append(self.create_projectile(starting_pos, target_pos, 5))
-        
+                thing.update_shooting_timer(dt)
+                if thing.can_see_player(self.player, self.barriers) and thing.type == 'shooter' and thing.ready_to_shoot():
+                    mx, my = self.player.rect.center
+                    angle_to_mouse = math.atan2(my - thing.rect.centery, mx - thing.rect.centerx)
+                    orbit_distance = 30
+                    gun_x = int(thing.rect.centerx + orbit_distance * math.cos(angle_to_mouse))
+                    gun_y = int(thing.rect.centery + orbit_distance * math.sin(angle_to_mouse))
+                    gun_position = (gun_x, gun_y)
 
-
+                    randomness = 60
+                    random_offset_x = random.randint(-randomness, randomness)
+                    random_offset_y = random.randint(-randomness, randomness)
+                    randomized_target_pos = (self.player.rect.centerx + random_offset_x, self.player.rect.centery + random_offset_y)
+                    self.projectiles2.append(self.create_projectile(gun_position, randomized_target_pos, 5))
+                    thing.shooting_delay = random.randint(500, 1500)  # Adjust these values as needed
+                    thing.shooting_timer = thing.shooting_delay
+    
+    def thingy_gun_position(self):
+        gun_positions = []
+        for thing in self.thingy:
+            
+            if thing.type == 'shooter':
+                mx, my = self.player.rect.center  # Use the current center of the player
+                angle_to_mouse = math.atan2(my - thing.rect.centery, mx - thing.rect.centerx)
+                orbit_distance = 30
+                orbit_circle_x = int(thing.rect.centerx + orbit_distance * math.cos(angle_to_mouse))
+                orbit_circle_y = int(thing.rect.centery + orbit_distance * math.sin(angle_to_mouse))
+                gun_positions.append((orbit_circle_x, orbit_circle_y))
+        return gun_positions
     def handle_shooting(self, player_moving):
         current_time = pygame.time.get_ticks()
         if current_time - self.last_shot_time >= self.shot_delay:
@@ -500,7 +520,9 @@ class ShootEmGame:
     def draw(self):
         self.win.blit(self.bg, (0, 0))
         pygame.draw.rect(self.win, "red", self.player.rect)
-        pygame.draw.circle(WIN, (0, 255, 0), self.gun_position(), 10)
+        pygame.draw.circle(WIN, 'green', self.gun_position(), 10)
+        for gun_position in self.thingy_gun_position():
+            pygame.draw.circle(WIN, 'yellow', gun_position, 5)
         for barrier in self.barriers:
             barrier.draw(self.win)
         #for barrier in self.barriers2:
