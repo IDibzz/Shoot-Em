@@ -256,11 +256,20 @@ class ShootEmGame:
             Barrier(WIDTH - 40, 0, 40, HEIGHT, 'white'),  
             Barrier(400,400, 200, 200, 'white')
         ]
-        self.barriers2 = [
+        self.lob = [
+            Barrier(0, 0, WIDTH, 40, 'white'),  
+            Barrier(0, HEIGHT - 40, WIDTH, 40, 'white'),  
+            Barrier(0, 0, 40, HEIGHT, 'white'),  
+            Barrier(WIDTH - 40, 0, 40, HEIGHT, 'white')
+        ]
+        self.barriers3 = [
             Barrier(360, 360, 40, 280, 'yellow'), #Barrier(380, 380, 20, 240, 'yellow')
             Barrier(600, 360, 40, 280, 'yellow'), #Barrier(600, 380, 20, 240, 'yellow')
             Barrier(400, 360, 200, 40, 'yellow'), #Barrier(400, 380, 200, 20, 'yellow')
             Barrier(400, 600, 200, 40, 'yellow')  #Barrier(400, 600, 200, 20, 'yellow')
+        ]
+        self.move_to_game = [
+            Barrier(200, 200, 10, 10, 'yellow')
         ]
         self.score = 0
         self.count = 0
@@ -270,17 +279,38 @@ class ShootEmGame:
         self.spawn_timer = 0
         self.enemy_count = 0
         self.within_dis = False
+        
           
+    
 
     def run(self):
         clock = pygame.time.Clock()
         current_time = pygame.time.get_ticks()
-        grid = self.create_grid(WIDTH, HEIGHT, self.barriers, 10)
-        run = True
+        
+        run = False
+        lobby = True
         inreach = False
-
+        
+        while lobby:
+            clock.tick(60)
+            keyss = pygame.key.get_pressed()
+            self.player.move(keyss, self.lob)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    lobby = False 
+            
+            for barrier in self.move_to_game:
+                if self.player.rect.colliderect(barrier.rect):
+                    lobby = False
+                    run = True
+            
+            self.draw2(clock)
+        
+        self.player = Player()
+        grid = self.create_grid(WIDTH, HEIGHT, self.barriers, 10)
         while run:
             dt = clock.tick(60)
+            
             keys = pygame.key.get_pressed()
             player_moving = self.check_player_movement(keys)
             
@@ -301,16 +331,11 @@ class ShootEmGame:
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     self.handle_shooting(player_moving)
                     
-            
-            
             self.thingy_shooting(dt)
-                
-            
-            
             self.update_projectiles()
             self.check_collisions()
             self.play_thingy_col()
-            self.draw()
+            self.draw(clock)
     
 
     def update(self, player, grid, cell_size, thing):
@@ -510,17 +535,29 @@ class ShootEmGame:
                 if projectile_rect2.colliderect(barrier.rect):
                     self.projectiles2.remove(projectile)
     def spawn_enemies(self):
-        self.spawn_timer += 1
-        if self.spawn_timer >= 1 and self.enemy_count < 5:
-            x = random.randint(0, WIDTH - thingy_width - 40)
-            y = random.randint(0, HEIGHT - thingy_height - 40)
-            type = 'normal' if random.randint(0, 1) == 0 else 'shooter'
-            enemy = Thingy(x, y, thingy_width, thingy_height, thingy_vel, type)
-            self.thingy.append(enemy)
-            self.enemy_count += 1
-            self.spawn_timer = 0 
-
-    def draw(self):
+        if self.enemy_count == 0:
+            num = 5
+            while num > 0:
+                x = random.randint(0, WIDTH - thingy_width - 40)
+                y = random.randint(0, HEIGHT - thingy_height - 40)
+                type = 'normal' if random.randint(0, 1) == 0 else 'shooter'
+                enemy = Thingy(x, y, thingy_width, thingy_height, thingy_vel, type)
+                self.thingy.append(enemy)
+                self.enemy_count += 1
+                for thing in self.thingy:
+                    for barrier in self.barriers:
+                        if thing.rect.colliderect(barrier.rect):
+                            self.thingy.remove(thing)
+                            self.enemy_count -= 1
+                            num += 1
+                num -= 1
+                           
+    def draw_frame_rate(self, clock):
+        fps = round(clock.get_fps(), 2)  # Get current FPS and round it to 2 decimal places
+        fps_text = FONT.render(f"FPS: {fps}", True, "white")  # Render the FPS text
+        self.win.blit(fps_text, (1650, 80))  # Draw the text on the screen at position (10, 10)      
+    
+    def draw(self, clock):
         self.win.blit(self.bg, (0, 0))
         pygame.draw.rect(self.win, "red", self.player.rect)
         pygame.draw.circle(WIN, 'green', self.gun_position(), 10)
@@ -542,7 +579,25 @@ class ShootEmGame:
         self.win.blit(version_text, (1650, 40))
         self.win.blit(score_text, (60, 40))
         self.win.blit(count_text, (60, 70))
+        fps = round(clock.get_fps(), 2)  # Get current FPS and round it to 2 decimal places
+        fps_text = FONT.render(f"FPS: {fps}", True, "white")  # Render the FPS text
+        self.win.blit(fps_text, (1650, 80))
         pygame.display.update()
+    def draw2(self, clock):
+        self.win.blit(self.bg, (0, 0))
+        pygame.draw.rect(self.win, "red", self.player.rect)
+        pygame.draw.circle(WIN, 'green', self.gun_position(), 10)
+        for barrier in self.lob:
+            barrier.draw(self.win)
+        for barrier in self.move_to_game:
+            barrier.draw(self.win)
+        version_text = FONT.render("Version 0.2.5", 1, "white")
+        self.win.blit(version_text, (1650, 40))
+        fps = round(clock.get_fps(), 2)  # Get current FPS and round it to 2 decimal places
+        fps_text = FONT.render(f"FPS: {fps}", True, "white")  # Render the FPS text
+        self.win.blit(fps_text, (1650, 80))
+        pygame.display.update()
+
 
 def main():
     game = ShootEmGame()
